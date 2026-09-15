@@ -187,11 +187,11 @@ class TokenizerClient:
                 await asyncio.sleep(delay)
         raise AssertionError("unreachable")
 
-    async def token_text(self, namespace: str, count: int) -> str:
+    async def token_text(self, namespace: str, count: int, *, cache: bool = True) -> str:
         if count == 0:
             return ""
         cache_key = (namespace, count)
-        if cache_key in self._text_cache:
+        if cache and cache_key in self._text_cache:
             return self._text_cache[cache_key]
         ids = self._token_ids.get(namespace)
         if ids is None:
@@ -200,7 +200,8 @@ class TokenizerClient:
             self._token_ids[namespace] = ids
         tokens = [ids[index % len(ids)] for index in range(count)]
         text = await self.detokenize_tokens(tokens)
-        self._text_cache[cache_key] = text
+        if cache:
+            self._text_cache[cache_key] = text
         return text
 
 
@@ -215,8 +216,12 @@ class PromptBuilder:
     ) -> None:
         self.config = config
         self.tokenizer = tokenizer
-        if config.replay.prompt_shape == "trace_record" and trace_ir is None:
-            raise ValueError("trace_record Prompt construction requires a validated unified Trace IR")
+        if config.replay.prompt_shape == "inferact_synthetic" and trace_ir is None:
+            raise ValueError("inferact_synthetic Prompt construction requires a validated unified Trace IR")
+        if config.replay.prompt_shape == "tracelab_synthetic" and (
+            trace_ir is None or trace_ir.prompt_source_kind != "token_recipe"
+        ):
+            raise ValueError("token_recipe Prompt construction requires token_recipe unified Trace IR")
         self.trace_texts = TraceTextStore(trace_ir) if trace_ir is not None else None
 
     async def build(
@@ -227,8 +232,10 @@ class PromptBuilder:
     ) -> SyntheticPrompt:
         """Build one node Prompt from its recipe, context mode, and prior exchange."""
 
-        if self.config.replay.prompt_shape == "trace_record":
+        if self.config.replay.prompt_shape == "inferact_synthetic":
             return await self._trace_record_prompt(node, context)
+        if self.config.replay.prompt_shape == "tracelab_synthetic":
+            return await self._tracelab_prompt(task, node, context)
         namespace = f"{task.runtime_session_id}:{node.prompt_recipe_key}"
         context_mode = getattr(node, "context_mode", "independent" if context is None else "append")
         if context_mode == "reset":
@@ -250,6 +257,28 @@ class PromptBuilder:
             namespace,
             node.planned_input_tokens,
             context_mode=context_mode,
+        )
+
+    async def _tracelab_prompt(
+        self,
+        task: ReplayTaskPlan,
+        node: ReplayPlanNode,
+        context: PromptExchange | None,
+    ) -> SyntheticPrompt:
+        """Append live assistant history and calibrate synthetic user text to the input target."""
+
+        if (node.context_after is not None) != (context is not None):
+            raise ValueError(f"tracelab request {node.source_key} has inconsistent context")
+        messages = list(context.prompt.messages) if context is not None else []
+        if context is not None:
+            messages.append({"role": "assistant", "content": context.assistant_content})
+        messages.append({"role": "user", "content": ""})
+        assert node.planned_input_tokens is not None
+        return await self._calibrate(
+            SyntheticPrompt("", (), tuple(messages)),
+            f"{task.runtime_session_id}:{node.prompt_recipe_key}",
+            node.planned_input_tokens,
+            context_mode=node.context_mode,
         )
 
     async def _auxiliary_prompt(
@@ -374,7 +403,7 @@ class PromptBuilder:
         assert self.trace_texts is not None
         reference = node.prompt_ref
         if not isinstance(reference, PromptReference):
-            raise ValueError(f"trace_record request {node.source_key} has no valid prompt_ref")
+            raise ValueError(f"inferact_synthetic request {node.source_key} has no valid prompt_ref")
         human_content = self.trace_texts.read(reference)
         user_message: dict[str, object] = {"role": "user", "content": human_content}
         if context is None:
@@ -391,7 +420,7 @@ class PromptBuilder:
         tolerance = self.config.replay.prompt_calibration_tolerance_tokens
         if abs(residual) > tolerance:
             logger.warning(
-                "trace_record Prompt exceeds the residual audit tolerance without modifying source text: "
+                "inferact_synthetic Prompt exceeds the residual audit tolerance without modifying source text: "
                 "source_key=%s target_tokens=%d final_tokens=%d residual_tokens=%d tolerance_tokens=%d",
                 node.source_key,
                 node.planned_input_tokens,

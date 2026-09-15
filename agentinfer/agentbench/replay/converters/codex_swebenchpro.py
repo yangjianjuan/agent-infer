@@ -27,7 +27,7 @@ from ..tokenizer_retry import TOKENIZER_REQUEST_MAX_ATTEMPTS, TOKENIZER_RETRY_BA
 from ..unified_trace_ir import write_trace_ir_manifest
 from .base import ConverterSummary, ReplayDatasetConverter
 
-_CONVERTER_VERSION = "agentinfer-codex-swebenchpro/v3"
+_CONVERTER_VERSION = "agentinfer-codex-swebenchpro"
 logger = logging.getLogger(__name__)
 
 
