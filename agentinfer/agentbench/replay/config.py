@@ -162,8 +162,8 @@ class ReplayConfig(ReplayStrictModel):
         if self.trace_type == "tracelab":
             if self.prompt_calibration_tolerance_tokens != 0:
                 raise ValueError("tracelab requires prompt_calibration_tolerance_tokens=0")
-        if self.trace_type == "agentX" and self.prompt_calibration_tolerance_tokens != 0:
-            raise ValueError("agentX requires prompt_calibration_tolerance_tokens=0")
+        if self.trace_type == "agentX" and "prompt_calibration_tolerance_tokens" in self.model_fields_set:
+            raise ValueError("agentX prompt_calibration_tolerance_tokens is fixed at 0 and cannot be configured")
         return self
 
     def context_micro_trim_limit(self, target: int) -> int:

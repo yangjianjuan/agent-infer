@@ -24,8 +24,4 @@ replay:
   interval_mode: trace
   sample_seed: 0
   max_inflight_requests: 8
-  context_adjustment_mode: strict
-  context_micro_trim_max_tokens: 64
-  context_micro_trim_max_ratio: 0.005
-  prompt_calibration_tolerance_tokens: 0
   request_timeout_seconds: 3600

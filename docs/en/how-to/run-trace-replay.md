@@ -134,6 +134,7 @@ live output is measured but never appended to the next input. The configured
 Backend model supplies all token IDs. Source model names remain in analysis and
 partition generated blocks within a runtime session. Repeated samples have
 different runtime session IDs and different token blocks.
+AgentX fixes `prompt_calibration_tolerance_tokens` at zero; omit it from AgentX configuration.
 
 The source's `t` and `api_time` infer the most recently completed scheduling
 predecessor. This is a timing relationship, not proof of parent/child causality;

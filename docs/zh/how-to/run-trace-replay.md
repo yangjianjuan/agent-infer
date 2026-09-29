@@ -125,6 +125,7 @@ Inferact 仍保留源 Human 文本及实时 Assistant 历史；超出校准容�
 保留它们共享的会话时间轴。每条请求的 `hash_ids` 表示完整输入。实时输出只用于本轮测量，不追加到下一轮。
 所有 token ID 使用配置的 Backend 模型；来源模型名称保留在分析产物中，并用于隔离同一 Runtime Session
 内的块。重复采样会生成独立的 Runtime Session 和块内容。
+AgentX 将 `prompt_calibration_tolerance_tokens` 固定为 `0`，请勿在 AgentX 配置中填写。
 
 转换器用 `t`、`api_time` 推断开始前最近完成的调度前驱。该关系只是时间推断，不代表已恢复父子因果；
 子 agent 身份仍会传递，`blocks_parent` 设为 false。转换结果保留零输出请求；若采样选中含此类请求的
